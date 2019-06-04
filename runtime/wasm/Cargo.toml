@@ -19,3 +19,6 @@ panic = 'abort'
 
 [lib]
 crate-type = ['cdylib']
+
+#[dependencies]
+#lazy_static = "1.3"

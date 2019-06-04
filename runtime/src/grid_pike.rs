@@ -1,20 +1,28 @@
-/// Copyright 2019 Steve Degosserie
-/// Hyperledger Grid Pike compatible runtime module
+// Copyright 2019 Steve Degosserie
+// Hyperledger Grid Pike compatible runtime module
 
+use rstd::prelude::*;
 use parity_codec::{Decode, Encode};
-use primitives::{H256};
 use runtime_primitives::traits::Hash;
 use support::{
 	decl_module, decl_storage, decl_event,
-	ensure, StorageValue, StorageMap,
-	dispatch::Result};
+	ensure, StorageMap,
+	dispatch::Result
+};
 use system::ensure_signed;
+// use lazy_static::lazy_static;
+
+// lazy_static! {
+// 	ref BYTEARRAY_LIMIT: usize = 100;
+// 	ref ORG_ID_INVALID_MSG: &str = format!("Organization ID required (1-{} bytes)", BYTEARRAY_LIMIT);
+// 	ref ORG_NAME_INVALID_MSG: &str = format!("Organization name required (1-{} bytes)", BYTEARRAY_LIMIT);
+// }
+
+pub type OrgHash<T> = <T as system::Trait>::Hash;
 
 pub trait Trait: system::Trait {
-	type Event: From<Event> + Into<<Self as system::Trait>::Event>;
+	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
-
-const BYTEARRAY_LIMIT: usize = 100;
 
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq)]
@@ -25,56 +33,43 @@ pub struct Organization {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as GridPike {
-		Organizations get(organizations): map H256 => Option<Organization>;
-	}
-}
-
-decl_module! {
-	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		fn deposit_event() = default;
-
-        pub fn create_org(origin, id: Vec<u8>, name: Vec<u8>) -> Result {
-            let _sender = ensure_signed(origin)?;
-			
-			ensure!(id.len() > 0 && id.len() <= BYTEARRAY_LIMIT, format!("Organization ID required (1-{} bytes)".into(), BYTEARRAY_LIMIT));
-			ensure!(name.len() > 0 && name.len() <= BYTEARRAY_LIMIT, format!("Organization name required (1-{} bytes)".into(), BYTEARRAY_LIMIT));
-
-			let digest = <<T as system::Trait>::Hashing as Hash>::hash(&id);
-			ensure!(Organizations::get(digest.clone()) == None, format!("Organization already exists: {}", String::from(id)));
-
-			let org = Organization {id, name};
-			Organizations::insert(&digest, org);
-
-			Self::deposit_event(RawEvent::OrganizationCreated(org));
-			Ok(())
-        }
-
-		// Just a dummy entry point.
-		// function that can be called by the external world as an extrinsics call
-		// takes a parameter of the type `AccountId`, stores it and emits an event
-		// pub fn do_something(origin, something: u32) -> Result {
-		// 	// TODO: You only need this if you want to check it was signed.
-		// 	let who = ensure_signed(origin)?;
-
-		// 	// TODO: Code to execute when something calls this.
-		// 	// For example: the following line stores the passed in u32 in the storage
-		// 	<Something<T>>::put(something);
-
-		// 	// here we are raising the Something event
-		// 	Self::deposit_event(RawEvent::SomethingStored(something, who));
-		// 	Ok(())
-		// }
+		// Mapping from organization hash to Organization data
+		Organizations: map OrgHash<T> => Organization;
 	}
 }
 
 decl_event!(
-	pub enum Event {
-		OrganizationCreated(Organization),
+	pub enum Event<T>
+	where <T as system::Trait>::Hash
+	{
+		OrganizationCreated(Hash, Vec<u8>),
 	}
 );
 
-impl<T: Trait> Module<T> {
+decl_module! {
+	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
+		fn deposit_event<T>() = default;
+
+        pub fn create_org(origin, id: Vec<u8>, name: Vec<u8>) -> Result {
+            let _origin = ensure_signed(origin)?;
+			
+			// ensure!(id.len() > 0 && id.len() <= BYTEARRAY_LIMIT, ORG_ID_INVALID_MSG);
+			// ensure!(name.len() > 0 && name.len() <= BYTEARRAY_LIMIT, ORG_NAME_INVALID_MSG);
+
+			let hash = T::Hashing::hash(&id);
+			ensure!(!<Organizations<T>>::exists(&hash), "");
+
+			let org = Organization {id: id.clone(), name};
+			<Organizations<T>>::insert(hash, org);
+
+			Self::deposit_event(RawEvent::OrganizationCreated(hash, id));
+			Ok(())
+        }
+	}
 }
+
+// impl<T: Trait> Module<T> {
+// }
 
 // tests for this module
 // #[cfg(test)]
