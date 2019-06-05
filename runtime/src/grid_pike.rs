@@ -1,4 +1,4 @@
-// Copyright 2019 Steve Degosserie
+// Copyright 2019 Steve Degosserie	
 // Hyperledger Grid Pike compatible runtime module
 
 use rstd::prelude::*;
@@ -10,13 +10,8 @@ use support::{
 	dispatch::Result
 };
 use system::ensure_signed;
-// use lazy_static::lazy_static;
 
-// lazy_static! {
-// 	ref BYTEARRAY_LIMIT: usize = 100;
-// 	ref ORG_ID_INVALID_MSG: &str = format!("Organization ID required (1-{} bytes)", BYTEARRAY_LIMIT);
-// 	ref ORG_NAME_INVALID_MSG: &str = format!("Organization name required (1-{} bytes)", BYTEARRAY_LIMIT);
-// }
+const BYTEARRAY_LIMIT: usize = 100;
 
 pub type OrgHash<T> = <T as system::Trait>::Hash;
 
@@ -52,9 +47,13 @@ decl_module! {
 
         pub fn create_org(origin, id: Vec<u8>, name: Vec<u8>) -> Result {
             let _origin = ensure_signed(origin)?;
-			
-			// ensure!(id.len() > 0 && id.len() <= BYTEARRAY_LIMIT, ORG_ID_INVALID_MSG);
-			// ensure!(name.len() > 0 && name.len() <= BYTEARRAY_LIMIT, ORG_NAME_INVALID_MSG);
+
+			if id.len() == 0 || id.len() > BYTEARRAY_LIMIT {
+				fail!(Err(format!("Organization ID required (1-{} bytes)", BYTEARRAY_LIMIT))
+			}
+			if name.len() == 0 || name.len() > BYTEARRAY_LIMIT {
+				Err(format!("Organization name required (1-{} bytes)", BYTEARRAY_LIMIT));
+			}
 
 			let hash = T::Hashing::hash(&id);
 			ensure!(!<Organizations<T>>::exists(&hash), "");
@@ -68,64 +67,63 @@ decl_module! {
 	}
 }
 
-// impl<T: Trait> Module<T> {
-// }
+#[cfg(test)]
+mod tests {
+	use super::*;
 
-// tests for this module
-// #[cfg(test)]
-// mod tests {
-// 	use super::*;
+	use runtime_io::with_externalities;
+	use primitives::{H256, Blake2Hasher};
+	use support::{impl_outer_origin, assert_ok};
+	use runtime_primitives::{
+		BuildStorage,
+		traits::{BlakeTwo256, IdentityLookup},
+		testing::{Digest, DigestItem, Header}
+	};
 
-// 	use runtime_io::with_externalities;
-// 	use primitives::{H256, Blake2Hasher};
-// 	use support::{impl_outer_origin, assert_ok};
-// 	use runtime_primitives::{
-// 		BuildStorage,
-// 		traits::{BlakeTwo256, IdentityLookup},
-// 		testing::{Digest, DigestItem, Header}
-// 	};
+	impl_outer_origin! {
+		pub enum Origin for GridPikeTest {}
+	}
 
-// 	impl_outer_origin! {
-// 		pub enum Origin for Test {}
-// 	}
+	#[derive(Clone, Eq, PartialEq)]
+	pub struct GridPikeTest;
 
-// 	// For testing the module, we construct most of a mock runtime. This means
-// 	// first constructing a configuration type (`Test`) which `impl`s each of the
-// 	// configuration traits of modules we want to use.
-// 	#[derive(Clone, Eq, PartialEq)]
-// 	pub struct Test;
-// 	impl system::Trait for Test {
-// 		type Origin = Origin;
-// 		type Index = u64;
-// 		type BlockNumber = u64;
-// 		type Hash = H256;
-// 		type Hashing = BlakeTwo256;
-// 		type Digest = Digest;
-// 		type AccountId = u64;
-// 		type Lookup = IdentityLookup<Self::AccountId>;
-// 		type Header = Header;
-// 		type Event = ();
-// 		type Log = DigestItem;
-// 	}
-// 	impl Trait for Test {
-// 		type Event = ();
-// 	}
-// 	type TemplateModule = Module<Test>;
+	impl system::Trait for GridPikeTest {
+		type Origin = Origin;
+		type Index = u64;
+		type BlockNumber = u64;
+		type Hash = H256;
+		type Hashing = BlakeTwo256;
+		type Digest = Digest;
+		type AccountId = u64;
+		type Lookup = IdentityLookup<Self::AccountId>;
+		type Header = Header;
+		type Event = ();
+		type Log = DigestItem;
+	}
+	impl Trait for GridPikeTest {
+		type Event = ();
+	}
 
-// 	// This function basically just builds a genesis storage key/value store according to
-// 	// our desired mockup.
-// 	fn new_test_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
-// 		system::GenesisConfig::<Test>::default().build_storage().unwrap().0.into()
-// 	}
+	type GridPike = Module<GridPikeTest>;
 
-// 	#[test]
-// 	fn it_works_for_default_value() {
-// 		with_externalities(&mut new_test_ext(), || {
-// 			// Just a dummy test for the dummy funtion `do_something`
-// 			// calling the `do_something` function with a value 42
-// 			assert_ok!(TemplateModule::do_something(Origin::signed(1), 42));
-// 			// asserting that the stored value is equal to what we stored
-// 			assert_eq!(TemplateModule::something(), Some(42));
-// 		});
-// 	}
-// }
+	fn build_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
+		system::GenesisConfig::<GridPikeTest>::default().build_storage().unwrap().0.into()
+	}
+
+	#[test]
+	fn it_works() {
+		with_externalities(&mut build_ext(), || {
+			assert!(true);
+		})
+	}
+
+	#[test]
+	fn create_org_with_valid_args() {
+		with_externalities(&mut build_ext(), || {
+			assert_ok!(GridPike::create_org(Origin::signed(1),
+				"parity", "Parity Tech"));
+			
+			//todo: test that org is stored by hash
+		})
+	}
+}
