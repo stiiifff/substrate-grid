@@ -31,13 +31,23 @@ pub struct Organization {
 	pub name: OrgName
 }
 
+#[cfg_attr(feature = "std", derive(Debug))]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq)]
+pub struct Agent<AccountId> {
+	pub org_id: OrgId,
+	pub pub_key: AccountId,
+	pub active: bool,
+	// pub roles:
+}
+
 pub trait Trait: system::Trait {
-	type Event: From<Event> + Into<<Self as system::Trait>::Event>;
+	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
 
 decl_storage! {
 	trait Store for Module<T: Trait> as GridPike {
 		Organizations get(org_by_id): map OrgId => Organization;
+		Agents get(agent_by_pubkey): map T::AccountId => Agent<T::AccountId>;
 	}
 
 	// add_extra_genesis {
@@ -54,34 +64,51 @@ decl_storage! {
 }
 
 decl_event!(
-	pub enum Event
+	pub enum Event<T>
+	where <T as system::Trait>::AccountId
 	{
 		OrganizationCreated(OrgId, OrgName),
+		AgentCreated(AccountId, OrgId),
 	}
 );
 
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {
-		fn deposit_event() = default;
+		fn deposit_event<T>() = default;
 
         pub fn create_org(origin, id: OrgId, name: OrgName) -> Result {
-            let _origin = ensure_signed(origin)?;
+            let sender = ensure_signed(origin)?;
 
-			if let Err(err) = Self::validate_new_org(&id, &name) {
+			if let Err(err) = Self::validate_new_org(&sender, &id, &name) {
 				fail!(err);
 			}
 
 			let org = Organization {id: id.clone(), name: name.clone()};
 			<Organizations<T>>::insert(&id, org);
 
-			Self::deposit_event(Event::OrganizationCreated(id, name));
+			let agent = Agent {org_id: id.clone(), pub_key: sender.clone(), active: true};
+			<Agents<T>>::insert(&sender, agent);
+
+			Self::deposit_event(RawEvent::OrganizationCreated(id.clone(), name));
+			Self::deposit_event(RawEvent::AgentCreated(sender, id));
+
 			Ok(())
         }
+
+		// pub fn create_agent(origin, org_id: OrgId, agent: T::AccountId, active: bool) -> Result {
+		// 	let _sender = ensure_signed(origin)?;
+
+		// 	let agent = Agent {org_id, pub_key}
+
+
+		// 	Ok(())
+		// }
 	}
 }
 
 impl<T: Trait> Module<T> {
-	fn validate_new_org(id: &[u8], name: &[u8]) -> Result {
+	fn validate_new_org(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
+		// ensure!(<Agents<T>>::exists(agent), "Agent does not exist");
 		ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
 		ensure!(id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
 		ensure!(name.len() > 0, ERR_ORG_NAME_REQUIRED);

@@ -205,7 +205,7 @@ construct_runtime!(
 		Indices: indices,
 		Balances: balances,
 		Sudo: sudo,
-		GridPike: grid_pike::{Module, Call, Storage, Event},
+		GridPike: grid_pike::{Module, Call, Storage, Event<T>},
 	}
 );
 
