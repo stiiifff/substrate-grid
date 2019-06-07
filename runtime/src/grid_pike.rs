@@ -19,10 +19,12 @@ const ERR_ORG_NAME_TOO_LONG : &str = "Organization name too long";
 const ERR_ORG_ALREADY_EXISTS : &str = "Organization already exists";
 
 const BYTEARRAY_LIMIT: usize = 100;
+const ROLE_ADMIN : &'static [u8;5] = b"admin";
 
 // This could be a DID
 pub type OrgId = Vec<u8>;
 pub type OrgName = Vec<u8>;
+pub type Role = Vec<u8>;
 
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq)]
@@ -35,9 +37,9 @@ pub struct Organization {
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq)]
 pub struct Agent<AccountId> {
 	pub org_id: OrgId,
-	pub pub_key: AccountId,
+	pub account: AccountId,
 	pub active: bool,
-	// pub roles:
+	pub roles: Vec<Role>
 }
 
 pub trait Trait: system::Trait {
@@ -47,7 +49,7 @@ pub trait Trait: system::Trait {
 decl_storage! {
 	trait Store for Module<T: Trait> as GridPike {
 		Organizations get(org_by_id): map OrgId => Organization;
-		Agents get(agent_by_pubkey): map T::AccountId => Agent<T::AccountId>;
+		Agents get(agent_by_account): map T::AccountId => Agent<T::AccountId>;
 	}
 
 	// add_extra_genesis {
@@ -83,10 +85,17 @@ decl_module! {
 				fail!(err);
 			}
 
+			//todo : create a builder
 			let org = Organization {id: id.clone(), name: name.clone()};
 			<Organizations<T>>::insert(&id, org);
 
-			let agent = Agent {org_id: id.clone(), pub_key: sender.clone(), active: true};
+			//todo : create a separate func + builder
+			let agent = Agent {
+				org_id: id.clone(),
+				account: sender.clone(),
+				active: true,
+				roles: vec![ROLE_ADMIN.to_vec()]
+			};
 			<Agents<T>>::insert(&sender, agent);
 
 			Self::deposit_event(RawEvent::OrganizationCreated(id.clone(), name));
@@ -108,7 +117,7 @@ decl_module! {
 
 impl<T: Trait> Module<T> {
 	fn validate_new_org(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
-		// ensure!(<Agents<T>>::exists(agent), "Agent does not exist");
+		ensure!(!<Agents<T>>::exists(agent), "Agent does not exist");
 		ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
 		ensure!(id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
 		ensure!(name.len() > 0, ERR_ORG_NAME_REQUIRED);
@@ -175,6 +184,7 @@ mod tests {
 		with_externalities(&mut build_ext(), || {
 			let id = String::from(TEST_ORG_ID).into_bytes();
 			let name = String::from(TEST_ORG_NAME).into_bytes();
+			let sender = Origin::signed(1);
 
 			assert_ok!(
 				GridPike::create_org(
@@ -185,7 +195,17 @@ mod tests {
 			
 			assert_eq!(
 				GridPike::org_by_id(&id),
-				Organization{id: id, name: name});
+				Organization{id: id.clone(), name: name});
+			
+			assert_eq!(
+				GridPike::agent_by_account(sender.clone()),
+				Agent {
+					org_id: id.to_vec(),
+					account: sender,
+					active: true,
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
 		})
 	}
 
@@ -246,7 +266,7 @@ mod tests {
 		with_externalities(&mut build_ext(), || {
 			let _ = 
 				GridPike::create_org(
-					Origin::signed(1),
+					Origin::signed(2),
 					String::from(TEST_EXISTING_ORG).into_bytes(),
 					String::from(TEST_ORG_NAME).into_bytes());
 
