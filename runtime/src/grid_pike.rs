@@ -48,8 +48,8 @@ pub trait Trait: system::Trait {
 
 decl_storage! {
 	trait Store for Module<T: Trait> as GridPike {
-		Organizations get(org_by_id): map OrgId => Organization;
-		Agents get(agent_by_account): map T::AccountId => Agent<T::AccountId>;
+		Organizations get(org_by_id): map OrgId => Option<Organization>;
+		Agents get(agent_by_account): map T::AccountId => Option<Agent<T::AccountId>>;
 	}
 
 	// add_extra_genesis {
@@ -89,7 +89,7 @@ decl_module! {
 			let org = Organization {id: id.clone(), name: name.clone()};
 			<Organizations<T>>::insert(&id, org);
 
-			//todo : create a separate func + builder
+			//todo : add private func + builder
 			let agent = Agent {
 				org_id: id.clone(),
 				account: sender.clone(),
@@ -116,6 +116,20 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
+	// PUBLIC IMMUTABLES
+
+	/// Checks whether an account has the 'Admin' role for the specified organization.
+	pub fn is_admin(account: &T::AccountId, org_id: OrgId) -> bool {
+		match <Agents<T>>::get(account) {
+			Some(agent) => {
+				agent.org_id == org_id && agent.active &&
+				agent.roles.contains(&ROLE_ADMIN.to_vec())
+			},
+			None => false
+		}
+	}
+
+	// PRIVATE MUTABLES
 	fn validate_new_org(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
 		ensure!(!<Agents<T>>::exists(agent), "Agent does not exist");
 		ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
@@ -167,7 +181,7 @@ mod tests {
 	type GridPike = super::Module<GridPikeTest>;
 
 	fn build_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
-		let mut t = system::GenesisConfig::<GridPikeTest>::default().build_storage().unwrap().0;
+		let t = system::GenesisConfig::<GridPikeTest>::default().build_storage().unwrap().0;
 		// t.extend(GenesisConfig::<GridPikeTest> {
 		// 	orgs: vec![ (String::from(TEST_EXISTING_ORG).into_bytes(), String::from(TEST_EXISTING_ORG).into_bytes()) ],
 		// }.build_storage().unwrap().0);
@@ -182,29 +196,41 @@ mod tests {
 	#[test]
 	fn create_org_with_valid_args() {
 		with_externalities(&mut build_ext(), || {
+			// Arrange
+			let sender = 1;
 			let id = String::from(TEST_ORG_ID).into_bytes();
 			let name = String::from(TEST_ORG_NAME).into_bytes();
-			let sender = Origin::signed(1);
 
-			assert_ok!(
-				GridPike::create_org(
-					Origin::signed(1),
-					id.clone(),
-					name.clone())
+			// Act
+			let result = GridPike::create_org(
+				Origin::signed(sender),
+				id.clone(),
+				name.clone()
+			);
+			
+			// Assert
+			assert_ok!(result);
+
+			assert_eq!(
+				GridPike::org_by_id(&id),
+				Some(
+					Organization {
+						id: id.clone(),
+						name: name
+					}
+				)
 			);
 			
 			assert_eq!(
-				GridPike::org_by_id(&id),
-				Organization{id: id.clone(), name: name});
-			
-			assert_eq!(
-				GridPike::agent_by_account(sender.clone()),
-				Agent {
-					org_id: id.to_vec(),
-					account: sender,
-					active: true,
-					roles: vec![ROLE_ADMIN.to_vec()]
-				}
+				GridPike::agent_by_account(&sender),
+				Some(
+					Agent {
+						org_id: id.clone(),
+						account: sender,
+						active: true,
+						roles: vec![ROLE_ADMIN.to_vec()]
+					}
+				)
 			);
 		})
 	}
@@ -276,6 +302,141 @@ mod tests {
 					String::from(TEST_EXISTING_ORG).into_bytes(),
 					String::from(TEST_ORG_NAME).into_bytes()),
 				ERR_ORG_ALREADY_EXISTS
+			);
+		})
+	}
+
+	#[test]
+	fn is_admin_for_actual_org_admin() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let org_id = String::from(TEST_ORG_ID).into_bytes();
+			
+			// Insert test data directly into storage to test public immutable func
+			Organizations::<GridPikeTest>::insert(&org_id,
+				Organization {
+					id: org_id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(agent,
+				Agent {
+					org_id: org_id.clone(),
+					account: agent,
+					active: true,
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+
+			// Test is_admin method
+			assert_eq!(
+				GridPike::is_admin(&agent, org_id),
+				true
+			);
+		})
+	}
+
+	#[test]
+	fn is_admin_for_unknown_agent() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let org_id = String::from(TEST_ORG_ID).into_bytes();
+			
+			assert_eq!(
+				GridPike::is_admin(&agent, org_id),
+				false
+			);
+		})
+	}
+
+	#[test]
+	fn is_admin_for_inactive_org_agent() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let org_id = String::from(TEST_ORG_ID).into_bytes();
+
+			// Insert test data directly into storage to test public immutable func
+			Organizations::<GridPikeTest>::insert(&org_id,
+				Organization {
+					id: org_id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(agent,
+				Agent {
+					org_id: org_id.clone(),
+					account: agent,
+					active: false,	// <-- /!\ Agent is inactive
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+			
+			assert_eq!(
+				GridPike::is_admin(&agent, org_id),
+				false
+			);
+		})
+	}
+
+	#[test]
+	fn is_admin_for_non_admin_org_agent() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let org_id = String::from(TEST_ORG_ID).into_bytes();
+
+			// Insert test data directly into storage to test public immutable func
+			Organizations::<GridPikeTest>::insert(&org_id,
+				Organization {
+					id: org_id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(agent,
+				Agent {
+					org_id: org_id.clone(),
+					account: agent,
+					active: true,	
+					roles: vec!()	// <-- /!\ Agent is not admin
+				}
+			);
+			
+			assert_eq!(
+				GridPike::is_admin(&agent, org_id),
+				false
+			);
+		})
+	}
+
+	#[test]
+	fn is_admin_for_agent_org_mismatch() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let id = String::from(TEST_ORG_ID).into_bytes();
+			let other_org = String::from(TEST_EXISTING_ORG).into_bytes();
+
+			// Insert test data directly into storage to test public immutable func
+			Organizations::<GridPikeTest>::insert(&id,
+				Organization {
+					id: id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(agent,
+				Agent {
+					org_id: id.clone(),
+					account: agent,
+					active: true,	
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+			
+			assert_eq!(
+				GridPike::is_admin(&agent, other_org),  // <-- /!\ Agent is admin for another org
+				false
 			);
 		})
 	}
