@@ -17,7 +17,9 @@ const ERR_ORG_ID_TOO_LONG : &str = "Organization ID too long";
 const ERR_ORG_NAME_REQUIRED : &str = "Organization name required";
 const ERR_ORG_NAME_TOO_LONG : &str = "Organization name too long";
 const ERR_ORG_ALREADY_EXISTS : &str = "Organization already exists";
+const ERR_ORG_DOES_NOT_EXIST : &str = "Organization does not exist";
 const ERR_AGENT_ALREADY_EXISTS: &str = "Agent already exists";
+const ERR_AGENT_MUST_BE_ORG_ADMIN: &str = "Agent must organization admin";
 
 const BYTEARRAY_LIMIT: usize = 100;
 const ROLE_ADMIN : &'static [u8;5] = b"admin";
@@ -105,14 +107,34 @@ decl_module! {
 			Ok(())
         }
 
-		// pub fn create_agent(origin, org_id: OrgId, agent: T::AccountId, active: bool) -> Result {
-		// 	let _sender = ensure_signed(origin)?;
+		pub fn create_agent(
+			origin, org_id: OrgId, account: T::AccountId,
+			active: bool, roles: Vec<Role>) -> Result {
+			let sender = ensure_signed(origin)?;
 
-		// 	let agent = Agent {org_id, pub_key}
+			ensure!(org_id.len() > 0, ERR_ORG_ID_REQUIRED);
+			ensure!(org_id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
 
+			// verify the signer of the transaction is authorized to create agent
+			if !Self::is_admin(&sender, org_id.clone()) {
+				fail!(ERR_AGENT_MUST_BE_ORG_ADMIN);
+			}
 
-		// 	Ok(())
-		// }
+			// Check if agent already exists
+			ensure!(!<Agents<T>>::exists(&account), ERR_AGENT_ALREADY_EXISTS);
+
+			let agent = Agent {
+				org_id: org_id.clone(),
+				account: account.clone(),
+				active: active,
+				roles: roles
+			};
+			<Agents<T>>::insert(&account, agent);
+
+			Self::deposit_event(RawEvent::AgentCreated(account, org_id));
+
+			Ok(())
+		}
 	}
 }
 
@@ -140,6 +162,10 @@ impl<T: Trait> Module<T> {
 		ensure!(!<Agents<T>>::exists(agent), ERR_AGENT_ALREADY_EXISTS);
 		Ok(())
 	}
+
+	// fn validate_agent(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
+
+	// }
 }
 
 #[cfg(test)]
@@ -194,6 +220,7 @@ mod tests {
 	const TEST_EXISTING_ORG : &str = "did:example:azertyuiop";
 	const LONG_VALUE : &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec aliquam ut tortor nec congue. Pellente";
 
+	// create_org tests
 	#[test]
 	fn create_org_with_valid_args() {
 		with_externalities(&mut build_ext(), || {
@@ -334,6 +361,106 @@ mod tests {
 		})
 	}
 
+	// create_agent tests
+	#[test]
+	fn create_agent_with_missing_org_id() {
+		with_externalities(&mut build_ext(), || {
+			assert_noop!(
+				GridPike::create_agent(
+					Origin::signed(1),
+					vec!(),
+					2, true, vec!()),
+				ERR_ORG_ID_REQUIRED
+			);
+		})
+	}
+
+	#[test]
+	fn create_agent_with_long_org_id() {
+		with_externalities(&mut build_ext(), || {
+			assert_noop!(
+				GridPike::create_agent(
+					Origin::signed(1),
+					String::from(LONG_VALUE).into_bytes(),
+					2, true, vec!()),
+				ERR_ORG_ID_TOO_LONG
+			);
+		})
+	}
+
+	// #[test]
+	// fn create_org_with_missing_name() {
+	// 	with_externalities(&mut build_ext(), || {
+	// 		assert_noop!(
+	// 			GridPike::create_org(
+	// 				Origin::signed(1),
+	// 				String::from(TEST_ORG_ID).into_bytes(),
+	// 				vec!()),
+	// 			ERR_ORG_NAME_REQUIRED
+	// 		);
+	// 	})
+	// }
+
+	// #[test]
+	// fn create_org_with_long_name() {
+	// 	with_externalities(&mut build_ext(), || {
+	// 		assert_noop!(
+	// 			GridPike::create_org(
+	// 				Origin::signed(1),
+	// 				String::from(TEST_ORG_ID).into_bytes(),
+	// 				String::from(LONG_VALUE).into_bytes()),
+	// 			ERR_ORG_NAME_TOO_LONG 
+	// 		);
+	// 	})
+	// }
+
+	// #[test]
+	// fn create_org_with_existing_id() {
+	// 	with_externalities(&mut build_ext(), || {
+	// 		let existing_org = String::from(TEST_EXISTING_ORG).into_bytes();
+
+	// 		Organizations::<GridPikeTest>::insert(&existing_org,
+	// 			Organization {
+	// 				id: existing_org.clone(),
+	// 				name: String::from(TEST_ORG_NAME).into_bytes()
+	// 			}
+	// 		);
+
+	// 		assert_noop!(
+	// 			GridPike::create_org(
+	// 				Origin::signed(1),
+	// 				existing_org.clone(),
+	// 				String::from(TEST_ORG_NAME).into_bytes()),
+	// 			ERR_ORG_ALREADY_EXISTS
+	// 		);
+	// 	})
+	// }
+
+	// #[test]
+	// fn create_org_with_existing_agent() {
+	// 	with_externalities(&mut build_ext(), || {
+	// 		// Arrange
+	// 		let sender = 1;
+	// 		let id = String::from(TEST_ORG_ID).into_bytes();
+	// 		let name = String::from(TEST_ORG_NAME).into_bytes();
+
+	// 		Agents::<GridPikeTest>::insert(sender,
+	// 			Agent {
+	// 				org_id: String::from(TEST_EXISTING_ORG).into_bytes(),
+	// 				account: sender,
+	// 				active: true,
+	// 				roles: vec![ROLE_ADMIN.to_vec()]
+	// 			}
+	// 		);
+			
+	// 		assert_noop!(
+	// 			GridPike::create_org(Origin::signed(sender), id, name),
+	// 			ERR_AGENT_ALREADY_EXISTS
+	// 		);
+	// 	})
+	// }
+
+	// is_admin tests
 	#[test]
 	fn is_admin_for_actual_org_admin() {
 		with_externalities(&mut build_ext(), || {
