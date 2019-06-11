@@ -17,6 +17,7 @@ const ERR_ORG_ID_TOO_LONG : &str = "Organization ID too long";
 const ERR_ORG_NAME_REQUIRED : &str = "Organization name required";
 const ERR_ORG_NAME_TOO_LONG : &str = "Organization name too long";
 const ERR_ORG_ALREADY_EXISTS : &str = "Organization already exists";
+const ERR_AGENT_ALREADY_EXISTS: &str = "Agent already exists";
 
 const BYTEARRAY_LIMIT: usize = 100;
 const ROLE_ADMIN : &'static [u8;5] = b"admin";
@@ -131,12 +132,12 @@ impl<T: Trait> Module<T> {
 
 	// PRIVATE MUTABLES
 	fn validate_new_org(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
-		ensure!(!<Agents<T>>::exists(agent), "Agent does not exist");
 		ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
 		ensure!(id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
 		ensure!(name.len() > 0, ERR_ORG_NAME_REQUIRED);
 		ensure!(name.len() <= BYTEARRAY_LIMIT, ERR_ORG_NAME_TOO_LONG);
 		ensure!(!<Organizations<T>>::exists::<Vec<u8>>(id.into()), ERR_ORG_ALREADY_EXISTS);
+		ensure!(!<Agents<T>>::exists(agent), ERR_AGENT_ALREADY_EXISTS);
 		Ok(())
 	}
 }
@@ -290,18 +291,45 @@ mod tests {
 	#[test]
 	fn create_org_with_existing_id() {
 		with_externalities(&mut build_ext(), || {
-			let _ = 
-				GridPike::create_org(
-					Origin::signed(2),
-					String::from(TEST_EXISTING_ORG).into_bytes(),
-					String::from(TEST_ORG_NAME).into_bytes());
+			let existing_org = String::from(TEST_EXISTING_ORG).into_bytes();
+
+			Organizations::<GridPikeTest>::insert(&existing_org,
+				Organization {
+					id: existing_org.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
 
 			assert_noop!(
 				GridPike::create_org(
 					Origin::signed(1),
-					String::from(TEST_EXISTING_ORG).into_bytes(),
+					existing_org.clone(),
 					String::from(TEST_ORG_NAME).into_bytes()),
 				ERR_ORG_ALREADY_EXISTS
+			);
+		})
+	}
+
+	#[test]
+	fn create_org_with_existing_agent() {
+		with_externalities(&mut build_ext(), || {
+			// Arrange
+			let sender = 1;
+			let id = String::from(TEST_ORG_ID).into_bytes();
+			let name = String::from(TEST_ORG_NAME).into_bytes();
+
+			Agents::<GridPikeTest>::insert(sender,
+				Agent {
+					org_id: String::from(TEST_EXISTING_ORG).into_bytes(),
+					account: sender,
+					active: true,
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+			
+			assert_noop!(
+				GridPike::create_org(Origin::signed(sender), id, name),
+				ERR_AGENT_ALREADY_EXISTS
 			);
 		})
 	}
