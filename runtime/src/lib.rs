@@ -342,8 +342,8 @@ pub mod opaque {
 
 /// This runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-	spec_name: create_runtime_str!("eternitrace"),
-	impl_name: create_runtime_str!("eternitrace"),
+	spec_name: create_runtime_str!("grid"),
+	impl_name: create_runtime_str!("grid"),
 	authoring_version: 3,
 	spec_version: 3,
 	impl_version: 0,

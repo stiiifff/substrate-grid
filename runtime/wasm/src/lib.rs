@@ -2,4 +2,4 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub use eternitrace_runtime::*;
+pub use grid_runtime::*;

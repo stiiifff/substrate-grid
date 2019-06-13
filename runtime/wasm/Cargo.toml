@@ -1,16 +1,16 @@
 [package]
 authors = ['Steve Degosserie <steve@block0.io>']
 edition = '2018'
-name = 'eternitrace-runtime-wasm'
+name = 'grid-runtime-wasm'
 version = '1.0.0'
 
 [features]
 default = []
-std = ['eternitrace-runtime/std']
+std = ['grid-runtime/std']
 
 [workspace]
 members = []
-[dependencies.eternitrace-runtime]
+[dependencies.grid-runtime]
 default-features = false
 path = '..'
 [profile.release]

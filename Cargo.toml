@@ -2,11 +2,11 @@
 authors = ['Parity Technologies <admin@parity.io>']
 build = 'build.rs'
 edition = '2018'
-name = 'eternitrace'
+name = 'grid'
 version = '1.0.0'
 
 [[bin]]
-name = 'eternitrace'
+name = 'grid'
 path = 'src/main.rs'
 [profile.release]
 panic = 'unwind'
@@ -49,7 +49,7 @@ git = 'https://github.com/paritytech/substrate.git'
 package = 'substrate-network'
 rev = '779a28a1111c46481e45d1a54d945cd361a9c73b'
 
-[dependencies.eternitrace-runtime]
+[dependencies.grid-runtime]
 path = 'runtime'
 
 [dependencies.primitives]
