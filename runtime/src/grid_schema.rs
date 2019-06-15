@@ -17,12 +17,26 @@ pub type SchemaName = Vec<u8>;
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq)]
 pub struct Schema {
-	pub name: OrgName
+	pub name: SchemaName
 }
 
 pub trait Trait: system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
+
+decl_storage! {
+	trait Store for Module<T: Trait> as GridSchema {
+		Schemas get(name): map SchemaName => Option<Schema>;
+	}
+}
+
+decl_event!(
+	pub enum Event<T>
+	where <T as system::Trait>::AccountId
+	{
+		SchemaCreated(SchemaName),
+	}
+);
 
 decl_module! {
 	pub struct Module<T: Trait> for enum Call where origin: T::Origin {

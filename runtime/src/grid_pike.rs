@@ -388,18 +388,39 @@ mod tests {
 		})
 	}
 
-	// #[test]
-	// fn create_org_with_missing_name() {
-	// 	with_externalities(&mut build_ext(), || {
-	// 		assert_noop!(
-	// 			GridPike::create_org(
-	// 				Origin::signed(1),
-	// 				String::from(TEST_ORG_ID).into_bytes(),
-	// 				vec!()),
-	// 			ERR_ORG_NAME_REQUIRED
-	// 		);
-	// 	})
-	// }
+	#[test]
+	fn create_agent_with_existing_account() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let id = String::from(TEST_ORG_ID).into_bytes();
+			let other_org = String::from(TEST_EXISTING_ORG).into_bytes();
+
+			// Insert test data directly into storage to test public immutable func
+			Organizations::<GridPikeTest>::insert(&id,
+				Organization {
+					id: id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(agent,
+				Agent {
+					org_id: id.clone(),
+					account: agent,
+					active: true,	
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+
+			assert_noop!(
+				GridPike::create_org(
+					Origin::signed(1),
+					String::from(TEST_ORG_ID).into_bytes(),
+					vec!()),
+				ERR_ORG_NAME_REQUIRED
+			);
+		})
+	}
 
 	// #[test]
 	// fn create_org_with_long_name() {

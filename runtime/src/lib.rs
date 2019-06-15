@@ -307,6 +307,7 @@ pub type Nonce = u64;
 /// Used for the module template in `./template.rs`
 // mod template;
 mod grid_pike;
+mod grid_schema;
 
 /// Opaque types. These are used by the CLI to instantiate machinery that don't need to know
 /// the specifics of the runtime. They can then be made to be agnostic over specific formats
@@ -455,6 +456,7 @@ construct_runtime!(
 		Balances: balances,
 		Sudo: sudo,
 		GridPike: grid_pike::{Module, Call, Storage, Event<T>},
+		GridSchema: grid_schema::{Module, Call, Storage, Event<T>},
 	}
 );
 
