@@ -19,7 +19,7 @@ const ERR_ORG_NAME_TOO_LONG : &str = "Organization name too long";
 const ERR_ORG_ALREADY_EXISTS : &str = "Organization already exists";
 const ERR_ORG_DOES_NOT_EXIST : &str = "Organization does not exist";
 const ERR_AGENT_ALREADY_EXISTS: &str = "Agent already exists";
-const ERR_AGENT_MUST_BE_ORG_ADMIN: &str = "Agent must organization admin";
+const ERR_AGENT_MUST_BE_ORG_ADMIN: &str = "Agent must be organization admin";
 
 const BYTEARRAY_LIMIT: usize = 100;
 const ROLE_ADMIN : &'static [u8;5] = b"admin";
@@ -363,6 +363,53 @@ mod tests {
 
 	// create_agent tests
 	#[test]
+	fn create_agent_with_valid_args() {
+		with_externalities(&mut build_ext(), || {
+			let admin = 1;
+			let agent = 2;
+			let id = String::from(TEST_ORG_ID).into_bytes();
+
+			// Create org & admin agent
+			Organizations::<GridPikeTest>::insert(&id,
+				Organization {
+					id: id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(admin,
+				Agent {
+					org_id: id.clone(),
+					account: admin,
+					active: true,	
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+
+			// Send tx to create non-admin agent for org
+			let result = GridPike::create_agent(
+				Origin::signed(admin),
+				String::from(TEST_ORG_NAME).into_bytes(),
+				agent, true, vec!()
+			);
+
+			assert_ok!(result);
+			
+			assert_eq!(
+				GridPike::agent_by_account(&agent),
+				Some(
+					Agent {
+						org_id: id.clone(),
+						account: agent,
+						active: true,
+						roles: vec!()
+					}
+				)
+			);
+		})
+	}
+
+	#[test]
 	fn create_agent_with_missing_org_id() {
 		with_externalities(&mut build_ext(), || {
 			assert_noop!(
@@ -388,18 +435,39 @@ mod tests {
 		})
 	}
 
-	// #[test]
-	// fn create_org_with_missing_name() {
-	// 	with_externalities(&mut build_ext(), || {
-	// 		assert_noop!(
-	// 			GridPike::create_org(
-	// 				Origin::signed(1),
-	// 				String::from(TEST_ORG_ID).into_bytes(),
-	// 				vec!()),
-	// 			ERR_ORG_NAME_REQUIRED
-	// 		);
-	// 	})
-	// }
+	#[test]
+	fn create_agent_with_existing_account() {
+		with_externalities(&mut build_ext(), || {
+			let agent = 1;
+			let id = String::from(TEST_ORG_ID).into_bytes();
+			let other_org = String::from(TEST_EXISTING_ORG).into_bytes();
+
+			// Insert test data directly into storage to test public immutable func
+			Organizations::<GridPikeTest>::insert(&id,
+				Organization {
+					id: id.clone(),
+					name: String::from(TEST_ORG_NAME).into_bytes()
+				}
+			);
+
+			Agents::<GridPikeTest>::insert(agent,
+				Agent {
+					org_id: id.clone(),
+					account: agent,
+					active: true,	
+					roles: vec![ROLE_ADMIN.to_vec()]
+				}
+			);
+
+			assert_noop!(
+				GridPike::create_agent(
+					Origin::signed(agent.clone()),
+					String::from(TEST_ORG_ID).into_bytes(),
+					agent, true, vec!()),
+				ERR_AGENT_ALREADY_EXISTS
+			);
+		})
+	}
 
 	// #[test]
 	// fn create_org_with_long_name() {
