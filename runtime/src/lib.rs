@@ -305,8 +305,6 @@ pub type BlockNumber = u64;
 /// Index of an account's extrinsic in the chain.
 pub type Nonce = u64;
 
-/// Used for the module template in `./template.rs`
-// mod template;
 mod grid_pike;
 mod grid_schema;
 
@@ -464,6 +462,7 @@ construct_runtime!(
 		Indices: indices,
 		Balances: balances,
 		Sudo: sudo,
+        
 		GridPike: grid_pike::{Module, Call, Storage, Event<T>},
 		GridSchema: grid_schema::{Module, Call, Storage, Event},
 	}

@@ -15,6 +15,7 @@ use system::ensure_signed;
 
 const ERR_SCHEMA_NAME_REQUIRED: &str = "Schema name required";
 const ERR_SCHEMA_NAME_TOO_LONG: &str = "Schema name too long";
+const ERR_SCHEMA_ALREADY_EXISTS: &str = "Schema already exists";
 
 const BYTEARRAY_LIMIT: usize = 100;
 
@@ -39,11 +40,7 @@ pub struct Schema {
 pub struct PropertyDefinition {
 	pub name: Name,
 	pub data_type: DataType,
-	required: bool,
-	// description: String,
-	// number_exponent: i32,
-	// enum_options: Vec<String>,
-    // struct_properties: Vec<PropertyDefinition>,
+	pub required: bool,
 }
 
 #[cfg_attr(feature = "std", derive(Debug))]
@@ -127,13 +124,14 @@ decl_module! {
 		pub fn create_schema(
 			origin, name: Name, owner: OrgId,
 			properties: Vec<PropertyDefinition>) -> Result {
-			let sender = ensure_signed(origin)?;
+			let _sender = ensure_signed(origin)?;
 
 			let schema = SchemaBuilder::default()
 				.with_name(name.clone())
 				.with_owner(owner.clone())
 				.with_properties(properties)
 				.build()?;
+			Self::validate_new_schema(&name)?;
 			<Schemas<T>>::insert(&name, schema);
 
 			Self::deposit_event(Event::SchemaCreated(name, owner));
@@ -144,6 +142,12 @@ decl_module! {
 }
 
 impl<T: Trait> Module<T> {
+
+	// Helpers
+    fn validate_new_schema(name: &[u8]) -> Result {
+        ensure!(!<Schemas<T>>::exists::<Vec<u8>>(name.into()), ERR_SCHEMA_ALREADY_EXISTS);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -195,8 +199,7 @@ mod tests {
 
     const TEST_ORG_ID: &str = "did:example:123456789abcdefghijk";
 	const TEST_SCHEMA_NAME: &str = "asset";
-    // const TEST_ORG_NAME: &str = "Parity Tech";
-    // const TEST_EXISTING_ORG: &str = "did:example:azertyuiop";
+    const TEST_ORG_NAME: &str = "Parity Tech";
     const LONG_VALUE : &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec aliquam ut tortor nec congue. Pellente";
 
 	const TYPE_PROP: &[u8] = b"type";
@@ -269,6 +272,52 @@ mod tests {
                     owner: owner,
 					properties: properties
                 })
+            );
+        })
+    }
+
+	#[test]
+    fn create_schema_with_missing_name() {
+        with_externalities(&mut build_ext(), || {
+            assert_noop!(
+                GridSchema::create_schema(
+					Origin::signed(1), vec!(), String::from(TEST_ORG_ID).into_bytes(), vec!()),
+                ERR_SCHEMA_NAME_REQUIRED
+            );
+        })
+    }
+
+    #[test]
+    fn create_schema_with_long_name() {
+        with_externalities(&mut build_ext(), || {
+            assert_noop!(
+                GridSchema::create_schema(
+                    Origin::signed(1),
+					String::from(LONG_VALUE).into_bytes(),
+                    String::from(TEST_ORG_ID).into_bytes(),
+                    vec!()
+                ),
+                ERR_SCHEMA_NAME_TOO_LONG
+            );
+        })
+    }
+
+    #[test]
+    fn create_schema_with_existing_name() {
+        with_externalities(&mut build_ext(), || {
+            let existing = String::from(TEST_SCHEMA_NAME).into_bytes();
+            let owner = String::from(TEST_ORG_NAME).into_bytes();
+
+			store_test_schema(existing.clone(), owner.clone());
+
+			assert_noop!(
+                GridSchema::create_schema(
+                    Origin::signed(1),
+					existing,
+                    owner,
+                    vec!()
+                ),
+                ERR_SCHEMA_ALREADY_EXISTS
             );
         })
     }
