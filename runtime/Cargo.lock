@@ -536,34 +536,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eternitrace-runtime"
-version = "1.0.0"
-dependencies = [
- "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
- "sr-io 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "sr-primitives 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "sr-std 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "sr-version 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-aura 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-balances 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-consensus 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-executive 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-indices 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-sudo 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-support 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-system 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "srml-timestamp 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "substrate-client 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "substrate-consensus-aura-primitives 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "substrate-consensus-authorities 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "substrate-offchain-primitives 0.1.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
- "substrate-primitives 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
-]
-
-[[package]]
 name = "failure"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -692,6 +664,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "gcc 0.3.55 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.58 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "grid-runtime"
+version = "1.0.0"
+dependencies = [
+ "parity-codec 3.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "safe-mix 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sr-io 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "sr-primitives 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "sr-std 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "sr-version 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-aura 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-balances 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-consensus 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-executive 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-indices 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-sudo 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-support 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-system 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "srml-timestamp 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "substrate-client 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "substrate-consensus-aura-primitives 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "substrate-consensus-authorities 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "substrate-offchain-primitives 0.1.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
+ "substrate-primitives 1.0.0 (git+https://github.com/paritytech/substrate.git?rev=779a28a1111c46481e45d1a54d945cd361a9c73b)",
 ]
 
 [[package]]
