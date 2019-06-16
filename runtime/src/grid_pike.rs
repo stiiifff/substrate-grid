@@ -29,6 +29,18 @@ pub type OrgId = Vec<u8>;
 pub type OrgName = Vec<u8>;
 pub type Role = Vec<u8>;
 
+fn validate_org_id(id: &[u8]) -> Result {
+	ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
+	ensure!(id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
+	Ok(())
+}
+
+fn validate_org_name(name: &[u8]) -> Result {
+	ensure!(name.len() > 0, ERR_ORG_NAME_REQUIRED);
+	ensure!(name.len() <= BYTEARRAY_LIMIT, ERR_ORG_NAME_TOO_LONG);
+	Ok(())
+}
+
 #[cfg_attr(feature = "std", derive(Debug))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq)]
 pub struct Organization {
@@ -45,6 +57,71 @@ pub struct Agent<AccountId> {
 	pub roles: Vec<Role>
 }
 
+#[derive(Default)]
+pub struct OrganizationBuilder {
+	id: OrgId,
+	name: OrgName
+}
+impl OrganizationBuilder {
+	pub fn with_id(mut self, id: OrgId) -> Self {
+		self.id = id;
+		self
+	}
+
+	pub fn with_name(mut self, name: OrgName) -> Self {
+		self.name = name;
+		self
+	}
+
+	pub fn build(self) -> rstd::result::Result<Organization, &'static str> {
+		validate_org_id(&self.id)?;
+		validate_org_name(&self.name)?;
+		let mut org = Organization::default();
+		org.id = self.id;
+		org.name = self.name;
+		Ok(org)
+	}
+}
+
+#[derive(Default)]
+pub struct AgentBuilder<AccountId> {
+	org_id: OrgId,
+	account: AccountId,
+	active: bool,
+	roles: Vec<Role>
+}
+impl<AccountId: Default> AgentBuilder<AccountId> {
+	pub fn with_org(mut self, org_id: OrgId) -> Self {
+		self.org_id = org_id;
+		self
+	}
+
+	pub fn with_account(mut self, account: AccountId) -> Self {
+		self.account = account;
+		self
+	}
+
+	pub fn is_active(mut self, active: bool) -> Self {
+		self.active = active;
+		self
+	}
+
+	pub fn with_roles(mut self, roles: Vec<Role>) -> Self {
+		self.roles = roles;
+		self
+	}
+
+	pub fn build(self) -> rstd::result::Result<Agent<AccountId>, &'static str> {
+		validate_org_id(&self.org_id)?;
+		let mut agent = Agent::<AccountId>::default();
+		agent.org_id = self.org_id;
+		agent.account = self.account;
+		agent.active = self.active;
+		agent.roles = self.roles;
+		Ok(agent)
+	}
+}
+
 pub trait Trait: system::Trait {
 	type Event: From<Event<Self>> + Into<<Self as system::Trait>::Event>;
 }
@@ -55,6 +132,7 @@ decl_storage! {
 		Agents get(agent_by_account): map T::AccountId => Option<Agent<T::AccountId>>;
 	}
 
+	//FIXME: does not compile -> tests setup storage data inline instead
 	// add_extra_genesis {
 	// 	config(orgs): Vec<(OrgId, OrgName)>;
 
@@ -73,7 +151,7 @@ decl_event!(
 	where <T as system::Trait>::AccountId
 	{
 		OrganizationCreated(OrgId, OrgName),
-		AgentCreated(AccountId, OrgId),
+		AgentCreated(OrgId, AccountId),
 	}
 );
 
@@ -83,26 +161,25 @@ decl_module! {
 
         pub fn create_org(origin, id: OrgId, name: OrgName) -> Result {
             let sender = ensure_signed(origin)?;
-
-			if let Err(err) = Self::validate_new_org(&sender, &id, &name) {
-				fail!(err);
-			}
-
-			//todo : create a builder
-			let org = Organization {id: id.clone(), name: name.clone()};
+			
+			let org = OrganizationBuilder::default()
+				.with_id(id.clone())
+				.with_name(name.clone())
+				.build()?;
+			Self::validate_new_org(&id)?;
 			<Organizations<T>>::insert(&id, org);
 
-			//todo : add private func + builder
-			let agent = Agent {
-				org_id: id.clone(),
-				account: sender.clone(),
-				active: true,
-				roles: vec![ROLE_ADMIN.to_vec()]
-			};
+			let agent = AgentBuilder::<T::AccountId>::default()
+				.with_org(id.clone())
+				.with_account(sender.clone())
+				.is_active(true)
+				.with_roles(vec![ROLE_ADMIN.to_vec()])
+				.build()?;
+			Self::validate_new_agent(&sender)?;
 			<Agents<T>>::insert(&sender, agent);
 
 			Self::deposit_event(RawEvent::OrganizationCreated(id.clone(), name));
-			Self::deposit_event(RawEvent::AgentCreated(sender, id));
+			Self::deposit_event(RawEvent::AgentCreated(id, sender));
 
 			Ok(())
         }
@@ -111,27 +188,21 @@ decl_module! {
 			origin, org_id: OrgId, account: T::AccountId,
 			active: bool, roles: Vec<Role>) -> Result {
 			let sender = ensure_signed(origin)?;
-
-			ensure!(org_id.len() > 0, ERR_ORG_ID_REQUIRED);
-			ensure!(org_id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
+			
+			let agent = AgentBuilder::<T::AccountId>::default()
+				.with_org(org_id.clone())
+				.with_account(account.clone())
+				.is_active(active)
+				.with_roles(roles)
+				.build()?;
+			Self::validate_new_agent(&account)?;
 
 			// verify the signer of the transaction is authorized to create agent
-			if !Self::is_admin(&sender, org_id.clone()) {
-				fail!(ERR_AGENT_MUST_BE_ORG_ADMIN);
-			}
+			Self::validate_is_org_admin(&sender, org_id.clone())?;
 
-			// Check if agent already exists
-			ensure!(!<Agents<T>>::exists(&account), ERR_AGENT_ALREADY_EXISTS);
-
-			let agent = Agent {
-				org_id: org_id.clone(),
-				account: account.clone(),
-				active: active,
-				roles: roles
-			};
 			<Agents<T>>::insert(&account, agent);
 
-			Self::deposit_event(RawEvent::AgentCreated(account, org_id));
+			Self::deposit_event(RawEvent::AgentCreated(org_id, account));
 
 			Ok(())
 		}
@@ -153,19 +224,24 @@ impl<T: Trait> Module<T> {
 	}
 
 	// PRIVATE MUTABLES
-	fn validate_new_org(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
-		ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
-		ensure!(id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
-		ensure!(name.len() > 0, ERR_ORG_NAME_REQUIRED);
-		ensure!(name.len() <= BYTEARRAY_LIMIT, ERR_ORG_NAME_TOO_LONG);
+
+	// Helpers
+	fn validate_new_org(id: &[u8]) -> Result {
 		ensure!(!<Organizations<T>>::exists::<Vec<u8>>(id.into()), ERR_ORG_ALREADY_EXISTS);
+		Ok(())
+	}
+
+	fn validate_new_agent(agent: &T::AccountId) -> Result {
 		ensure!(!<Agents<T>>::exists(agent), ERR_AGENT_ALREADY_EXISTS);
 		Ok(())
 	}
 
-	// fn validate_agent(agent: &T::AccountId, id: &[u8], name: &[u8]) -> Result {
-
-	// }
+	fn validate_is_org_admin(account: &T::AccountId, org_id: OrgId) -> Result {
+		match Self::is_admin(account, org_id) {
+			true => Ok(()),
+			false => Err(ERR_AGENT_MUST_BE_ORG_ADMIN)
+		}
+	}
 }
 
 #[cfg(test)]
@@ -209,6 +285,7 @@ mod tests {
 
 	fn build_ext() -> runtime_io::TestExternalities<Blake2Hasher> {
 		let t = system::GenesisConfig::<GridPikeTest>::default().build_storage().unwrap().0;
+		//FIXME: doesn't work, see add_extra_genesis above
 		// t.extend(GenesisConfig::<GridPikeTest> {
 		// 	orgs: vec![ (String::from(TEST_EXISTING_ORG).into_bytes(), String::from(TEST_EXISTING_ORG).into_bytes()) ],
 		// }.build_storage().unwrap().0);
@@ -319,11 +396,12 @@ mod tests {
 	fn create_org_with_existing_id() {
 		with_externalities(&mut build_ext(), || {
 			let existing_org = String::from(TEST_EXISTING_ORG).into_bytes();
+			let name = String::from(TEST_ORG_NAME).into_bytes();
 
 			Organizations::<GridPikeTest>::insert(&existing_org,
 				Organization {
 					id: existing_org.clone(),
-					name: String::from(TEST_ORG_NAME).into_bytes()
+					name: name.clone()
 				}
 			);
 
@@ -331,7 +409,7 @@ mod tests {
 				GridPike::create_org(
 					Origin::signed(1),
 					existing_org.clone(),
-					String::from(TEST_ORG_NAME).into_bytes()),
+					name),
 				ERR_ORG_ALREADY_EXISTS
 			);
 		})
@@ -389,7 +467,7 @@ mod tests {
 			// Send tx to create non-admin agent for org
 			let result = GridPike::create_agent(
 				Origin::signed(admin),
-				String::from(TEST_ORG_NAME).into_bytes(),
+				id.clone(),
 				agent, true, vec!()
 			);
 
