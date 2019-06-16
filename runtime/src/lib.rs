@@ -447,6 +447,10 @@ impl grid_pike::Trait for Runtime {
     type Event = Event;
 }
 
+impl grid_schema::Trait for Runtime {
+    type Event = Event;
+}
+
 construct_runtime!(
 	pub enum Runtime with Log(InternalLog: DigestItem<Hash, AuthorityId, AuthoritySignature>) where
 		Block = Block,
@@ -461,7 +465,7 @@ construct_runtime!(
 		Balances: balances,
 		Sudo: sudo,
 		GridPike: grid_pike::{Module, Call, Storage, Event<T>},
-		GridSchema: grid_schema::{Module, Call, Storage, Event<T>},
+		GridSchema: grid_schema::{Module, Call, Storage, Event},
 	}
 );
 
