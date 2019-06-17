@@ -1,10 +1,10 @@
-# Substrate Grid &emsp; [![build]][codeship] [![rustc]][rustc_1_35] [![license]][license_mit]
+# Substrate Grid &emsp; [![build]][codeship] [![rustc]][rustc_nighlty] [![license]][license_mit]
 
 [build]: https://app.codeship.com/projects/2663ec20-7322-0137-6fec-5af050f70adb/status?branch=master
 [codeship]: https://app.codeship.com/projects/348677
 
 [rustc]: https://img.shields.io/badge/rustc-1.35+-lightgray.svg
-[rustc_1_35]: https://blog.rust-lang.org/2019/05/23/Rust-1.35.0.html
+[rustc_nightly]: https://blog.rust-lang.org/2019/05/23/Rust-1.35.0.html
 
 [license]: https://img.shields.io/badge/license-MIT-blue.svg
 [license_mit]: https://github.com/stiiifff/substrate-grid/blob/master/LICENSE
