@@ -1,4 +1,4 @@
-# Substrate Grid &emsp; [![build]][codeship] [![rustc]][rustc_nighlty] [![license]][license_mit]
+# Substrate Grid &emsp; [![build]][codeship] [![rustc]][rustc_nightly] [![license]][license_mit]
 
 [build]: https://app.codeship.com/projects/2663ec20-7322-0137-6fec-5af050f70adb/status?branch=master
 [codeship]: https://app.codeship.com/projects/348677
