@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use log::info;
 use transaction_pool::{self, txpool::{Pool as TransactionPool}};
-use eternitrace_runtime::{self, GenesisConfig, opaque::Block, RuntimeApi};
+use grid_runtime::{self, GenesisConfig, opaque::Block, RuntimeApi};
 use substrate_service::{
 	FactoryFullConfiguration, LightComponents, FullComponents, FullBackend,
 	FullClient, LightClient, LightBackend, FullExecutor, LightExecutor,
@@ -24,9 +24,9 @@ pub use substrate_executor::NativeExecutor;
 // Our native executor instance.
 native_executor_instance!(
 	pub Executor,
-	eternitrace_runtime::api::dispatch,
-	eternitrace_runtime::native_version,
-	include_bytes!("../runtime/wasm/target/wasm32-unknown-unknown/release/eternitrace_runtime_wasm.compact.wasm")
+	grid_runtime::api::dispatch,
+	grid_runtime::native_version,
+	include_bytes!("../runtime/wasm/target/wasm32-unknown-unknown/release/grid_runtime_wasm.compact.wasm")
 );
 
 #[derive(Default)]
