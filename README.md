@@ -11,9 +11,19 @@
 
 # Grid
 
-A new SRML-based Substrate node, ready for hacking.
+**Substrate Grid** is an exploration into re-implementing parts of the [Hyperledger Grid](https://grid.hyperledger.org/about/) project onto the [Parity Substrate](https://www.parity.io/substrate/) technology.
 
-# Building
+> Hyperledger Grid is a platform for building supply chain solutions that include distributed ledger components. The project provides a set of modular components for developing smart contracts and client interfaces, including domain-specific data models (such as GS1 product definitions), smart-contract business logic, libraries, and SDKs.
+
+**Substrate Grid** differs (for now) from the original implementation on the following points:
+* It strives to use native Substrate data formats & libraries as much as possible (e.g. **Parity Codec vs Google Protobuf**).
+* The **Pike**, **Schema** and **Track&Trace** contracts are re-implemented as [**Substrate Runtime Modules**](https://substrate.dev/docs/en/runtime/substrate-runtime-module-library), instead of **Wasm contracts**.
+* The Substrate WASM runtime is leveraged as-is, no attempt is made (for now) to re-implement [Hyperledger Sawtooth](https://github.com/hyperledger/sawtooth-core) and [Sawtooth Sabre](https://github.com/hyperledger/sawtooth-sabre) on top of Substrate (if that makes any sense ..).
+* The original implementation tends to store a lot of **String** data on-chain. While this is a design decision that can be debatted, and is generally frowned upon on Substrate, **Substrate Grid** retains *some* of those to remain somewhat faithfull to the original design, but otherwise offload most of the data off-chain.
+* The Hyperledger Grid contracts tend to use 
+
+
+# Build
 
 Install Rust:
 
@@ -39,7 +49,16 @@ Build all native code:
 cargo build
 ```
 
+# Test
+
+```bash
+cargo test -p grid-runtime grid_pike
+cargo test -p grid-runtime grid_schema
+```
+
 # Run
+
+Note: this project is based on the [Substrate Node template](https://github.com/paritytech/substrate/tree/master/node-template).
 
 You can start a development chain with:
 
@@ -80,5 +99,6 @@ Additional CLI usage options are available and may be shown by running `cargo ru
 
 ## License
 
-`substrate-grid` is licensed under the MIT license. Please read the [LICENSE](LICENSE) file in this repository for more information.
+The `Substrate Node template` is is free and unencumbered software released into the public domain. Please read the [UNLICENSE](UNLICENSE) file in this repository for more information.
 
+The `Substrate Grid runtime` is licensed under the MIT license. Please read the [MIT_LICENSE](MIT_LICENSE) file in this repository for more information.
