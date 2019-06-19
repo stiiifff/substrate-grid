@@ -9,8 +9,6 @@
 [license]: https://img.shields.io/badge/license-MIT-blue.svg
 [license_mit]: https://github.com/stiiifff/substrate-grid/blob/master/LICENSE
 
-# Grid
-
 **Substrate Grid** is an exploration into re-implementing parts of the [Hyperledger Grid](https://grid.hyperledger.org/about/) project onto the [Parity Substrate](https://www.parity.io/substrate/) technology.
 
 > Hyperledger Grid is a platform for building supply chain solutions that include distributed ledger components. The project provides a set of modular components for developing smart contracts and client interfaces, including domain-specific data models (such as GS1 product definitions), smart-contract business logic, libraries, and SDKs.
