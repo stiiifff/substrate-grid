@@ -7,7 +7,7 @@
 [rustc_nightly]: https://blog.rust-lang.org/2019/05/23/Rust-1.35.0.html
 
 [license]: https://img.shields.io/badge/license-MIT-blue.svg
-[license_mit]: https://github.com/stiiifff/substrate-grid/blob/master/LICENSE
+[license_mit]: https://github.com/stiiifff/substrate-grid/blob/master/LICENSE_MIT
 
 **Substrate Grid** is an exploration into re-implementing parts of the [Hyperledger Grid](https://grid.hyperledger.org/about/) project onto the [Parity Substrate](https://www.parity.io/substrate/) technology.
 
