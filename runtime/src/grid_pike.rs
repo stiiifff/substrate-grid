@@ -28,7 +28,7 @@ pub type OrgId = Vec<u8>;
 pub type OrgName = Vec<u8>;
 pub type Role = Vec<u8>;
 
-fn validate_org_id(id: &[u8]) -> Result {
+pub fn validate_org_id(id: &[u8]) -> Result {
     ensure!(id.len() > 0, ERR_ORG_ID_REQUIRED);
     ensure!(id.len() <= BYTEARRAY_LIMIT, ERR_ORG_ID_TOO_LONG);
     Ok(())

@@ -1,0 +1,29 @@
+{
+    "OrgId": "Vec<u8>",
+    "OrgName": "Vec<u8>",
+    "Role": "Vec<u8>",
+    "Name": "Vec<u8>",
+    "Organization": {
+        "id": "OrgId",
+        "name": "OrgName"
+    },
+    "Agent": {
+        "org_id": "OrgId",
+        "account": "AccountId",
+        "active": "bool",
+        "roles": "Vec<Role>"
+    },
+    "DataType": {
+        "_enum": ["Bytes", "Boolean", "Number", "String", "Enum", "Struct", "LatLong"]
+    },
+    "PropertyDefinition": {
+        "name": "Name",
+        "data_type": "DataType",
+        "required": "bool"
+    },
+    "Schema": {
+        "name": "Name",
+        "owne": "OrgId",
+        "properties": "Vec<PropertyDefinition>"
+    }
+}
