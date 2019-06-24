@@ -8,7 +8,7 @@ use parity_codec::{Decode, Encode};
 // use runtime_primitives::traits::Hash;``
 use support::{
 	decl_module, decl_storage, decl_event,
-	ensure, fail, StorageMap,
+	ensure, StorageMap,
 	dispatch::Result
 };
 use system::ensure_signed;
