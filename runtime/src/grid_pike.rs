@@ -5,7 +5,8 @@ use parity_codec::{Decode, Encode};
 use rstd::prelude::*;
 // use runtime_io::{with_storage, StorageOverlay, ChildrenStorageOverlay};
 // use runtime_primitives::traits::Hash;``
-use support::{decl_event, decl_module, decl_storage, dispatch::Result, ensure, fail, StorageMap};
+use support::{decl_event, decl_module, decl_storage,
+    dispatch::Result, ensure, fail, StorageValue, StorageMap};
 use system::ensure_signed;
 
 const ERR_ORG_ID_REQUIRED: &str = "Organization ID required";
@@ -53,7 +54,7 @@ pub struct Agent<AccountId> {
     pub org_id: OrgId,
     pub account: AccountId,
     pub active: bool,
-    pub roles: Vec<Role>,
+    pub role_ids: Vec<u32>,
 }
 
 #[derive(Default)]
@@ -87,7 +88,7 @@ pub struct AgentBuilder<AccountId> {
     org_id: OrgId,
     account: AccountId,
     active: bool,
-    roles: Vec<Role>,
+    role_ids: Vec<u32>,
 }
 impl<AccountId: Default> AgentBuilder<AccountId> {
     pub fn with_org(mut self, org_id: OrgId) -> Self {
@@ -105,18 +106,13 @@ impl<AccountId: Default> AgentBuilder<AccountId> {
         self
     }
 
-    pub fn with_roles(mut self, roles: Vec<Role>) -> Self {
-        self.roles = roles;
-        self
-    }
-
     pub fn build(self) -> rstd::result::Result<Agent<AccountId>, &'static str> {
         validate_org_id(&self.org_id)?;
         let mut agent = Agent::<AccountId>::default();
         agent.org_id = self.org_id;
         agent.account = self.account;
         agent.active = self.active;
-        agent.roles = self.roles;
+        agent.role_ids = self.role_ids;
         Ok(agent)
     }
 }
@@ -129,6 +125,10 @@ decl_storage! {
     trait Store for Module<T: Trait> as GridPike {
         Organizations get(org_by_id): map OrgId => Option<Organization>;
         Agents get(agent_by_account): map T::AccountId => Option<Agent<T::AccountId>>;
+
+        Roles get(role_by_index): map u32 => Role;
+        RolesCount get(roles_count): u32;
+        RolesIndex get(role_index): map Role => u32;
     }
 
     //FIXME: does not compile -> tests setup storage data inline instead
@@ -167,13 +167,16 @@ decl_module! {
                 .build()?;
             Self::validate_new_org(&id)?;
 
-            let agent = AgentBuilder::<T::AccountId>::default()
+            let mut agent = AgentBuilder::<T::AccountId>::default()
                 .with_org(id.clone())
                 .with_account(sender.clone())
                 .is_active(true)
-                .with_roles(vec![ROLE_ADMIN.to_vec()])
                 .build()?;
             Self::validate_new_agent(&sender)?;
+
+            // Do this after all valitadions cause we're potentially mutating state
+            let admin_role_id = Self::get_or_add_role_id(ROLE_ADMIN.to_vec())?;
+            agent.role_ids = vec![admin_role_id];
 
 			<Organizations<T>>::insert(&id, org);
             <Agents<T>>::insert(&sender, agent);
@@ -189,17 +192,24 @@ decl_module! {
             active: bool, roles: Vec<Role>) -> Result {
             let sender = ensure_signed(origin)?;
 
-            let agent = AgentBuilder::<T::AccountId>::default()
+            let mut agent = AgentBuilder::<T::AccountId>::default()
                 .with_org(org_id.clone())
                 .with_account(account.clone())
                 .is_active(active)
-                .with_roles(roles)
                 .build()?;
             Self::validate_new_agent(&account)?;
 			Self::validate_existing_org(&org_id)?;
 
             // verify the signer of the transaction is authorized to create agent
             Self::validate_is_org_admin(&sender, org_id.clone())?;
+
+            // Do this after all valitadions cause we're potentially mutating state
+            // let role_ids: Vec<u32> =
+            //     roles.iter()
+            //          .map(move |&role| Self::get_or_add_role_id(role))
+            //          .take_while(Result::is_ok)
+            //          .collect();
+            // agent.role_ids = role_ids;
 
             <Agents<T>>::insert(&account, agent);
 
@@ -222,6 +232,22 @@ impl<T: Trait> Module<T> {
     }
 
     // PRIVATE MUTABLES
+    fn get_or_add_role_id(role: Role) -> rstd::result::Result<u32, &'static str> {
+        match <RolesIndex<T>>::exists(&role) {
+            true => Ok(<RolesIndex<T>>::get(&role)),
+            false => {
+                let roles_count = Self::roles_count();
+                let new_role_idx = roles_count.checked_add(1)
+                    .ok_or("Overflow adding a new role")?;
+                
+                <Roles<T>>::insert(new_role_idx, role.clone());
+                <RolesCount<T>>::put(new_role_idx);
+                <RolesIndex<T>>::insert(role, new_role_idx);
+
+                Ok(new_role_idx)
+            }
+        }
+    }
 
     // Helpers
     fn validate_new_org(id: &[u8]) -> Result {
@@ -243,12 +269,13 @@ impl<T: Trait> Module<T> {
     }
 
     fn validate_is_org_admin(account: &T::AccountId, org_id: OrgId) -> Result {
+        let admin_role_id = <RolesIndex<T>>::get(ROLE_ADMIN.to_vec());
 		match <Agents<T>>::get(account) {
             Some(agent) => {
 				if agent.org_id != org_id {
 					fail!(ERR_SENDER_MUST_BE_ORG_AGENT);
 				}
-				if !agent.roles.contains(&ROLE_ADMIN.to_vec()) {
+				if !agent.role_ids.contains(&admin_role_id) {
 					fail!(ERR_SENDER_MUST_BE_ORG_ADMIN);
 				}
 				if !agent.active {
@@ -329,17 +356,31 @@ mod tests {
 
 	fn store_test_agent(
 		account: u64, org_id: OrgId,
-		active: bool, roles: Vec<Role>) {
+		active: bool, role_ids: Vec<u32>) {
 		Agents::<GridPikeTest>::insert(
 			&account,
 			Agent {
 				org_id: org_id,
 				account: account,
 				active: active,
-				roles: roles,
+				role_ids: role_ids,
 			},
 		);
 	}
+
+    fn store_admin_role() -> u32 {
+        let admin_role = ROLE_ADMIN.to_vec();
+
+        let roles_count = <RolesCount<GridPikeTest>>::get();
+        let new_role_idx = roles_count.checked_add(1)
+            .expect("Overflow adding a new role");
+        
+        <Roles<GridPikeTest>>::insert(new_role_idx, admin_role.clone());
+        <RolesCount<GridPikeTest>>::put(new_role_idx);
+        <RolesIndex<GridPikeTest>>::insert(admin_role, new_role_idx);
+
+        new_role_idx
+    }
 
     // create_org tests
     #[test]
@@ -365,12 +406,27 @@ mod tests {
             );
 
             assert_eq!(
+                Roles::<GridPikeTest>::get(1),
+                ROLE_ADMIN.to_vec()
+            );
+
+            assert_eq!(
+                RolesCount::<GridPikeTest>::get(),
+                1
+            );
+
+            assert_eq!(
+                RolesIndex::<GridPikeTest>::get(ROLE_ADMIN.to_vec()),
+                1
+            );
+
+            assert_eq!(
                 GridPike::agent_by_account(&sender),
                 Some(Agent {
                     org_id: id.clone(),
                     account: sender,
                     active: true,
-                    roles: vec![ROLE_ADMIN.to_vec()]
+                    role_ids: vec![1]
                 })
             );
         })
@@ -474,8 +530,9 @@ mod tests {
             let id = String::from(TEST_ORG_ID).into_bytes();
 
             // Create org & admin agent
+            store_admin_role();
 			store_test_org(id.clone(), String::from(TEST_ORG_NAME).into_bytes());
-			store_test_agent(admin.clone(), id.clone(), true, vec![ROLE_ADMIN.to_vec()]);
+			store_test_agent(admin.clone(), id.clone(), true, vec![1]);
 
             // Send tx to create non-admin agent for org
             let result =
@@ -489,7 +546,7 @@ mod tests {
                     org_id: id.clone(),
                     account: agent,
                     active: true,
-                    roles: vec!()
+                    role_ids: vec!()
                 })
             );
         })
@@ -590,7 +647,7 @@ mod tests {
 
 			store_test_org(id.clone(), org_name.clone());
 			store_test_org(other_org.clone(), org_name.clone());
-			store_test_agent(admin.clone(), other_org.clone(), true, vec![ROLE_ADMIN.to_vec()]);
+			store_test_agent(admin.clone(), other_org.clone(), true, vec![1]);
 
             assert_noop!(
                 GridPike::create_agent(
@@ -635,8 +692,9 @@ mod tests {
 			let agent = 2;
             let id = String::from(TEST_ORG_ID).into_bytes();
 
+            store_admin_role();
 			store_test_org(id.clone(), String::from(TEST_ORG_NAME).into_bytes());
-			store_test_agent(admin.clone(), id.clone(), false, vec![ROLE_ADMIN.to_vec()]);
+			store_test_agent(admin.clone(), id.clone(), false, vec![1]);
 
             assert_noop!(
                 GridPike::create_agent(
@@ -659,8 +717,9 @@ mod tests {
             let org_id = String::from(TEST_ORG_ID).into_bytes();
 
 			// Insert test data directly into storage to test public immutable func
+            store_admin_role();
 			store_test_org(org_id.clone(), String::from(TEST_ORG_NAME).into_bytes());
-			store_test_agent(agent, org_id.clone(), true, vec![ROLE_ADMIN.to_vec()]);
+			store_test_agent(agent, org_id.clone(), true, vec![1]);
 
             // Test is_admin method
             assert_eq!(GridPike::is_admin(&agent, org_id), true);
@@ -685,7 +744,7 @@ mod tests {
 
 			// Insert test data directly into storage to test public immutable func
 			store_test_org(org_id.clone(), String::from(TEST_ORG_NAME).into_bytes());
-			store_test_agent(agent, org_id.clone(), false, vec![ROLE_ADMIN.to_vec()]); // <-- /!\ Agent is inactive
+			store_test_agent(agent, org_id.clone(), false, vec![1]); // <-- /!\ Agent is inactive
 
             assert_eq!(GridPike::is_admin(&agent, org_id), false);
         })
@@ -714,7 +773,7 @@ mod tests {
 
 			// Insert test data directly into storage to test public immutable func
 			store_test_org(id.clone(), String::from(TEST_ORG_NAME).into_bytes());
-			store_test_agent(agent, id.clone(), true, vec![ROLE_ADMIN.to_vec()]);
+			store_test_agent(agent, id.clone(), true, vec![1]);
 
             assert_eq!(
                 GridPike::is_admin(&agent, other_org), // <-- /!\ Agent is admin for another org
