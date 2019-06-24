@@ -20,11 +20,14 @@
 * The original implementation tends to store a lot of **String** data on-chain. While this is a design decision that can be debatted, and is generally frowned upon, **Substrate Grid** retains *some* of those to remain somewhat faithfull to the original design, but otherwise offload most of the data off-chain.
 
 # Todos / Improvements
-* Avoid using Vec<u8> as key in maps, used u32 indexed lists instead.
-* Continue work on Pike & Schema, then Track & Trace contracts.
-* Offload unnecessary on-chain storage to either DID claims or decentralized storage (e.g. IPFS).
-* Integration with existing governance-related Sustrate runtime modules into Grid Pike's features (mgmt of the consortium's organizations & agents).
-* Investigate full port of Sawtooth / Sabre as alternative runtime storage, so that the Hyperledger Grid contracts can run as-is, avoiding a re-implementation (and tedious work for keeping in sync).
+
+* Pike: implement update_org & update_agent transaction types.
+* Schema: todo.
+* Track & Trace contracts: todo, not started yet.
+* Storage: Avoid using Vec<u8> as key in maps, used u32 indexed lists instead.
+* Storage: Offload unnecessary on-chain storage to either DID claims or decentralized storage (e.g. IPFS).
+* Substrate: Integration with existing governance-related Sustrate runtime modules into Grid Pike's features (mgmt of the consortium's organizations & agents).
+* Sawtooth: Investigate full port of Sawtooth / Sabre as alternative runtime storage, so that the Hyperledger Grid contracts can run as-is, avoiding a re-implementation (and tedious work for keeping in sync).
 
 # Build
 
