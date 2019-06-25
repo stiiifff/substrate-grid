@@ -2,10 +2,12 @@
 // Hyperledger Grid Schema compatible runtime module
 
 use crate::grid_pike::{OrgId, validate_org_id};
+use crate::grid_pike::Trait as PikeTrait;
+use crate::grid_pike::Module as PikeModule;
 use rstd::prelude::*;
 use parity_codec::{Decode, Encode};
 // use runtime_io::{with_storage, StorageOverlay, ChildrenStorageOverlay};
-// use runtime_primitives::traits::Hash;``
+// use runtime_primitives::traits::Hash;
 use support::{
 	decl_module, decl_storage, decl_event,
 	ensure, StorageMap,
@@ -99,7 +101,7 @@ impl SchemaBuilder {
 	}
 }
 
-pub trait Trait: system::Trait {
+pub trait Trait: PikeTrait {
 	type Event: From<Event /*<Self> */> + Into<<Self as system::Trait>::Event>;
 }
 
@@ -124,7 +126,7 @@ decl_module! {
 		pub fn create_schema(
 			origin, name: Name, owner: OrgId,
 			properties: Vec<PropertyDefinition>) -> Result {
-			let _sender = ensure_signed(origin)?;
+			let sender = ensure_signed(origin)?;
 
 			let schema = SchemaBuilder::default()
 				.with_name(name.clone())
@@ -132,6 +134,18 @@ decl_module! {
 				.with_properties(properties)
 				.build()?;
 			Self::validate_new_schema(&name)?;
+
+			// Validate org exists
+			<PikeModule<T>>::validate_existing_org(&owner)?;
+			// Validate signer is an active agent of the specified org
+			<PikeModule<T>>::validate_is_org_active_agent(&sender, owner.clone())?;
+
+			// Check whether signer has the right to create schema
+			// TODO: add has_permission fn to grid_pike module (permission = role)
+			// check_permission(perm_checker, signer, "can_create_schema")?;
+
+			//TODO: add properties validation (name, data_type & related props)
+
 			<Schemas<T>>::insert(&name, schema);
 
 			Self::deposit_event(Event::SchemaCreated(name, owner));
@@ -153,6 +167,10 @@ impl<T: Trait> Module<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+	use crate::grid_pike::{
+		ERR_ORG_DOES_NOT_EXIST, ERR_SENDER_IS_NOT_AN_AGENT,
+		ERR_SENDER_MUST_BE_ORG_AGENT, ERR_SENDER_MUST_BE_ACTIVE_ADMIN};
+	use crate::grid_pike::tests::{store_test_org, store_test_agent, store_admin_role};
 
     use primitives::{Blake2Hasher, H256};
     use runtime_io::with_externalities;
@@ -186,6 +204,9 @@ mod tests {
     impl Trait for GridSchemaTest {
         type Event = ();
     }
+	impl PikeTrait for GridSchemaTest {
+		type Event = ();
+	}
 
     type GridSchema = super::Module<GridSchemaTest>;
 
@@ -200,36 +221,13 @@ mod tests {
     const TEST_ORG_ID: &str = "did:example:123456789abcdefghijk";
 	const TEST_SCHEMA_NAME: &str = "asset";
     const TEST_ORG_NAME: &str = "Parity Tech";
+	const TEST_EXISTING_ORG: &str = "did:example:azertyuiop";
     const LONG_VALUE : &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec aliquam ut tortor nec congue. Pellente";
 
 	const TYPE_PROP: &[u8] = b"type";
 	const WEIGHT_PROP: &[u8] = b"weight";
 	const TEMP_PROP: &[u8] = b"temperature";
 	const LOCATION_PROP: &[u8] = b"location";
-
-	// fn store_test_org(id: OrgId, name: OrgName) {
-	// 	Organizations::<GridPikeTest>::insert(
-	// 		id.clone(),
-	// 		Organization {
-	// 			id: id,
-	// 			name: name,
-	// 		},
-	// 	);
-	// }
-
-	// fn store_test_agent(
-	// 	account: u64, org_id: OrgId,
-	// 	active: bool, roles: Vec<Role>) {
-	// 	Agents::<GridPikeTest>::insert(
-	// 		&account,
-	// 		Agent {
-	// 			org_id: org_id,
-	// 			account: account,
-	// 			active: active,
-	// 			roles: roles,
-	// 		},
-	// 	);
-	// }
 
 	fn store_test_schema(name: Name, owner: OrgId) {
 		Schemas::<GridSchemaTest>::insert(
@@ -257,6 +255,11 @@ mod tests {
 				PropertyDefinition { name: TEMP_PROP.to_vec(), data_type: DataType::Number, required: false },
 				PropertyDefinition { name: LOCATION_PROP.to_vec(), data_type: DataType::LatLong, required: false },
 			];
+
+			// Store org & agent
+			let admin_role_id = store_admin_role();
+			store_test_org(owner.clone(), String::from(TEST_ORG_NAME).into_bytes());
+			store_test_agent(sender, owner.clone(), true, vec![admin_role_id]);
 
             // Act
             let result = GridSchema::create_schema(
@@ -318,6 +321,95 @@ mod tests {
                     vec!()
                 ),
                 ERR_SCHEMA_ALREADY_EXISTS
+            );
+        })
+    }
+
+	#[test]
+    fn create_schema_with_unknown_org() {
+        with_externalities(&mut build_ext(), || {
+			let sender = 1;
+            let schema = String::from(TEST_SCHEMA_NAME).into_bytes();
+            let owner = String::from(TEST_ORG_NAME).into_bytes();
+
+			assert_noop!(
+                GridSchema::create_schema(
+                    Origin::signed(sender),
+					schema,
+                    owner,
+                    vec!()
+                ),
+                ERR_ORG_DOES_NOT_EXIST
+            );
+        })
+    }
+
+	#[test]
+    fn create_schema_with_unknown_sender() {
+        with_externalities(&mut build_ext(), || {
+			let sender = 1;
+            let schema = String::from(TEST_SCHEMA_NAME).into_bytes();
+            let owner = String::from(TEST_ORG_NAME).into_bytes();
+
+			let _admin_role_id = store_admin_role();
+			store_test_org(owner.clone(), String::from(TEST_ORG_NAME).into_bytes());
+
+			assert_noop!(
+                GridSchema::create_schema(
+                    Origin::signed(sender),
+					schema,
+                    owner,
+                    vec!()
+                ),
+                ERR_SENDER_IS_NOT_AN_AGENT
+            );
+        })
+    }
+
+	#[test]
+    fn create_schema_with_invalid_sender() {
+        with_externalities(&mut build_ext(), || {
+			let admin = 1;
+            let owner = String::from(TEST_ORG_ID).into_bytes();
+            let other_org = String::from(TEST_EXISTING_ORG).into_bytes();
+			let org_name = String::from(TEST_ORG_NAME).into_bytes();
+			let schema = String::from(TEST_SCHEMA_NAME).into_bytes();
+
+			store_test_org(owner.clone(), org_name.clone());
+			store_test_org(other_org.clone(), org_name.clone());
+			store_test_agent(admin.clone(), other_org.clone(), true, vec!());
+
+			assert_noop!(
+                GridSchema::create_schema(
+                    Origin::signed(admin),
+					schema,
+                    owner,
+                    vec!()
+                ),
+                ERR_SENDER_MUST_BE_ORG_AGENT
+            );
+        })
+    }
+
+	#[test]
+    fn create_schema_with_inactive_agent() {
+        with_externalities(&mut build_ext(), || {
+			let admin = 1;
+            let owner = String::from(TEST_ORG_ID).into_bytes();
+			let org_name = String::from(TEST_ORG_NAME).into_bytes();
+			let schema = String::from(TEST_SCHEMA_NAME).into_bytes();
+
+			store_test_org(owner.clone(), org_name.clone());
+			store_test_agent(admin.clone(), owner.clone(), false, vec!());
+
+			assert_noop!(
+                GridSchema::create_schema(
+                    Origin::signed(admin),
+					schema,
+                    owner,
+                    vec!()
+                ),
+                ERR_SENDER_MUST_BE_ACTIVE_ADMIN
             );
         })
     }

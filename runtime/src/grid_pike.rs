@@ -9,20 +9,20 @@ use support::{decl_event, decl_module, decl_storage,
     dispatch::Result, ensure, fail, StorageValue, StorageMap};
 use system::ensure_signed;
 
-const ERR_ORG_ID_REQUIRED: &str = "Organization ID required";
-const ERR_ORG_ID_TOO_LONG: &str = "Organization ID too long";
-const ERR_ORG_NAME_REQUIRED: &str = "Organization name required";
-const ERR_ORG_NAME_TOO_LONG: &str = "Organization name too long";
-const ERR_ORG_ALREADY_EXISTS: &str = "Organization already exists";
-const ERR_ORG_DOES_NOT_EXIST: &str = "Organization does not exist";
-const ERR_AGENT_ALREADY_EXISTS: &str = "Agent already exists";
-const ERR_SENDER_IS_NOT_AN_AGENT: &str = "Sender must be a known organization agent";
-const ERR_SENDER_MUST_BE_ORG_AGENT: &str = "Sender must be agent of the specified organization";
-const ERR_SENDER_MUST_BE_ORG_ADMIN: &str = "Sender must be organization admin";
-const ERR_SENDER_MUST_BE_ACTIVE_ADMIN: &str = "Sender must be an active organization admin";
+pub const ERR_ORG_ID_REQUIRED: &str = "Organization ID required";
+pub const ERR_ORG_ID_TOO_LONG: &str = "Organization ID too long";
+pub const ERR_ORG_NAME_REQUIRED: &str = "Organization name required";
+pub const ERR_ORG_NAME_TOO_LONG: &str = "Organization name too long";
+pub const ERR_ORG_ALREADY_EXISTS: &str = "Organization already exists";
+pub const ERR_ORG_DOES_NOT_EXIST: &str = "Organization does not exist";
+pub const ERR_AGENT_ALREADY_EXISTS: &str = "Agent already exists";
+pub const ERR_SENDER_IS_NOT_AN_AGENT: &str = "Sender must be a known organization agent";
+pub const ERR_SENDER_MUST_BE_ORG_AGENT: &str = "Sender must be agent of the specified organization";
+pub const ERR_SENDER_MUST_BE_ORG_ADMIN: &str = "Sender must be organization admin";
+pub const ERR_SENDER_MUST_BE_ACTIVE_ADMIN: &str = "Sender must be an active organization admin";
 
-const BYTEARRAY_LIMIT: usize = 100;
-const ROLE_ADMIN: &[u8; 5] = b"admin";
+pub const BYTEARRAY_LIMIT: usize = 100;
+pub const ROLE_ADMIN: &[u8; 5] = b"admin";
 
 // This could be a DID
 pub type OrgId = Vec<u8>;
@@ -201,7 +201,8 @@ decl_module! {
 			Self::validate_existing_org(&org_id)?;
 
             // verify the signer of the transaction is authorized to create agent
-            Self::validate_is_org_admin(&sender, org_id.clone())?;
+            Self::validate_is_org_active_agent(&sender, org_id.clone())?;
+            Self::validate_is_agent_admin(&sender)?;
 
             // Do this after all valitadions cause we're potentially mutating state
             agent.role_ids = Self::get_or_add_roles(roles)?;
@@ -220,10 +221,60 @@ impl<T: Trait> Module<T> {
 
     /// Checks whether an account has the 'Admin' role for the specified organization.
     pub fn is_admin(account: &T::AccountId, org_id: OrgId) -> bool {
-		match Self::validate_is_org_admin(account, org_id) {
-			Ok(_) => true,
-			Err(_) => false
-		}
+        match Self::validate_is_org_active_agent(account, org_id.clone()) {
+            Ok(_) => match Self::validate_is_agent_admin(account) {
+                Ok(_) => true,
+                Err(_) => false
+            }
+            Err(_) => false
+        }
+    }
+
+    // Helpers
+    pub fn validate_new_org(id: &[u8]) -> Result {
+        ensure!(
+            !<Organizations<T>>::exists::<Vec<u8>>(id.into()),
+            ERR_ORG_ALREADY_EXISTS
+        );
+        Ok(())
+    }
+
+	pub fn validate_existing_org(id: &[u8]) -> Result {
+		ensure!(<Organizations<T>>::exists::<Vec<u8>>(id.into()), ERR_ORG_DOES_NOT_EXIST);
+		Ok(())
+	}
+
+    pub fn validate_new_agent(agent: &T::AccountId) -> Result {
+        ensure!(!<Agents<T>>::exists(agent), ERR_AGENT_ALREADY_EXISTS);
+        Ok(())
+    }
+
+    pub fn validate_is_org_active_agent(account: &T::AccountId, org_id: OrgId) -> Result {
+		match <Agents<T>>::get(account) {
+            Some(agent) => {
+				if agent.org_id != org_id {
+					fail!(ERR_SENDER_MUST_BE_ORG_AGENT);
+				}
+				if !agent.active {
+					fail!(ERR_SENDER_MUST_BE_ACTIVE_ADMIN);
+				}
+				Ok(())
+            },
+            None => fail!(ERR_SENDER_IS_NOT_AN_AGENT)
+        }
+    }
+
+    pub fn validate_is_agent_admin(account: &T::AccountId) -> Result {
+        let admin_role_id = <RolesIndex<T>>::get(ROLE_ADMIN.to_vec());
+		match <Agents<T>>::get(account) {
+            Some(agent) => {
+				if !agent.role_ids.contains(&admin_role_id) {
+					fail!(ERR_SENDER_MUST_BE_ORG_ADMIN);
+				}
+				Ok(())
+            },
+            None => fail!(ERR_SENDER_IS_NOT_AN_AGENT)
+        }
     }
 
     // PRIVATE MUTABLES
@@ -254,48 +305,10 @@ impl<T: Trait> Module<T> {
             }
         }
     }
-
-    // Helpers
-    fn validate_new_org(id: &[u8]) -> Result {
-        ensure!(
-            !<Organizations<T>>::exists::<Vec<u8>>(id.into()),
-            ERR_ORG_ALREADY_EXISTS
-        );
-        Ok(())
-    }
-
-	fn validate_existing_org(id: &[u8]) -> Result {
-		ensure!(<Organizations<T>>::exists::<Vec<u8>>(id.into()), ERR_ORG_DOES_NOT_EXIST);
-		Ok(())
-	}
-
-    fn validate_new_agent(agent: &T::AccountId) -> Result {
-        ensure!(!<Agents<T>>::exists(agent), ERR_AGENT_ALREADY_EXISTS);
-        Ok(())
-    }
-
-    fn validate_is_org_admin(account: &T::AccountId, org_id: OrgId) -> Result {
-        let admin_role_id = <RolesIndex<T>>::get(ROLE_ADMIN.to_vec());
-		match <Agents<T>>::get(account) {
-            Some(agent) => {
-				if agent.org_id != org_id {
-					fail!(ERR_SENDER_MUST_BE_ORG_AGENT);
-				}
-				if !agent.role_ids.contains(&admin_role_id) {
-					fail!(ERR_SENDER_MUST_BE_ORG_ADMIN);
-				}
-				if !agent.active {
-					fail!(ERR_SENDER_MUST_BE_ACTIVE_ADMIN);
-				}
-				Ok(())
-            },
-            None => fail!(ERR_SENDER_IS_NOT_AN_AGENT)
-        }
-    }
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     use primitives::{Blake2Hasher, H256};
@@ -350,7 +363,7 @@ mod tests {
     const TEST_EXISTING_ORG: &str = "did:example:azertyuiop";
     const LONG_VALUE : &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec aliquam ut tortor nec congue. Pellente";
 
-	fn store_test_org(id: OrgId, name: OrgName) {
+	pub fn store_test_org(id: OrgId, name: OrgName) {
 		Organizations::<GridPikeTest>::insert(
 			id.clone(),
 			Organization {
@@ -360,7 +373,7 @@ mod tests {
 		);
 	}
 
-	fn store_test_agent(
+	pub fn store_test_agent(
 		account: u64, org_id: OrgId,
 		active: bool, role_ids: Vec<u32>) {
 		Agents::<GridPikeTest>::insert(
@@ -374,7 +387,7 @@ mod tests {
 		);
 	}
 
-    fn store_admin_role() -> u32 {
+    pub fn store_admin_role() -> u32 {
         let admin_role = ROLE_ADMIN.to_vec();
 
         let roles_count = <RolesCount<GridPikeTest>>::get();

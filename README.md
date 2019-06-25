@@ -22,8 +22,8 @@
 # Todos / Improvements
 
 * Pike: implement update_org & update_agent transaction types.
-* Schema: todo.
-* Track & Trace contracts: todo, not started yet.
+* Schema: implement missing validations & permission checks, and schema update.
+* Product and Track&Trace contracts: todo, not started yet.
 * Storage: Avoid using Vec<u8> as key in maps, used u32 indexed lists instead.
 * Storage: Offload unnecessary on-chain storage to either DID claims or decentralized storage (e.g. IPFS).
 * Substrate: Integration with existing governance-related Sustrate runtime modules into Grid Pike's features (mgmt of the consortium's organizations & agents).
