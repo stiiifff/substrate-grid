@@ -11,7 +11,7 @@
         "org_id": "OrgId",
         "account": "AccountId",
         "active": "bool",
-        "roles": "Vec<Role>"
+        "roles": "Vec<u32>"
     },
     "DataType": {
         "_enum": ["Bytes", "Boolean", "Number", "String", "Enum", "Struct", "LatLong"]
