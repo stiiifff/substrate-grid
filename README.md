@@ -57,6 +57,8 @@ cargo build
 
 # Test
 
+Run tests for the Pike & Schema modules:
+
 ```bash
 cargo test -p grid-runtime grid_pike
 cargo test -p grid-runtime grid_schema
@@ -102,6 +104,34 @@ cargo run -- \
 ```
 
 Additional CLI usage options are available and may be shown by running `cargo run -- --help`.
+
+# Test with Substrate UI
+
+Once a local node is running, open the [Substrate UI](https://substrate-ui.parity.io) in your browser.
+
+Then, in the **Settings** section:
+* **Developer** tab: Paste the content of the [type_defs.json](type_defs.json) file in the text area, and **Save**. This will ensure **Substrate UI** is able to recognize the custom types of our custom **Substrate Runtime modules**.
+* **General** tab: select the Local Node in the list.
+
+If configured correctly, the **Substrate UI** should display several UI components in the sidebar such as **Explorer**, **Accounts**, **Address book** among others.
+
+Creation of an organization & agent in the **Extrinsics** tab:
+
+* Create an organization
+  * Select the **gridPike** module and **createOrg** function
+  * Specify an organization ID and name in hexadecimal formats (e.g. 0x67726964 for 'grid' in ASCII characters).
+  * Click on the **Submit Transaction** button.
+  * If all goes well, the transaction is mined in a block, and the chain state is mutated.
+* Create an admin agent
+  * Select the **gridPike** module and **createAgent** function
+  * Specify the ID of the previously created organization (in hexa).
+  * Choose an account in the list e.g. ALICE in the dev chain.
+  * Choose whether the agent should be active or not.
+  * Optionally assign one or more role(s) to the agent (role name in hexa).
+  * Click on the **Submit Transaction** button.
+  * If all goes well, the transaction is mined in a block, and the chain state is mutated.
+* Verify that the organization & agent were stored on-chain, using the **Chain state** tab
+  * Select the **gridPike** module, then call the **agents** and **organizations** immutable functions (and optionnally the role-related ones) to verify that the organization & agent were indeed recorded.
 
 ## License
 
